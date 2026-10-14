@@ -204,8 +204,13 @@ def configurazione():
     # Trova credenziali studente selezionato
     cred = next((s for s in studenti if s['nome'] == sel), {})
     
+    spid = None
+    if cred.get('accesso') == 'spid':
+        import spid_auth
+        spid = spid_auth.stato(sel)
     cfg = {
-        'connesso': len(studenti) > 0 and bool(cred.get('codice_scuola')),
+        'spid': spid,
+        'connesso': len(studenti) > 0 and bool(cred.get('codice_scuola')) and (not spid or spid['stato'] == 'collegato'),
         'username': cred.get('username',''),
         'codice_scuola': cred.get('codice_scuola',''),
         'genitore1_nome': os.environ.get('GENITORE1_NOME', 'Genitore 1'),
@@ -241,6 +246,29 @@ def api_test_connessione():
         return jsonify({'ok': True, 'n_compiti': len(compiti)})
     except Exception as e:
         return jsonify({'ok': False, 'errore': str(e)})
+
+# ── SPID ─────────────────────────────────────────────────────────────────────
+
+@app.route('/api/spid/<azione>', methods=['POST'])
+@app.route('/<path:prefix>/api/spid/<azione>', methods=['POST'])
+def api_spid(azione, prefix=None):
+    """link / collega / stato per l'accesso con SPID (sperimentale)."""
+    import spid_auth
+    dati = request.get_json(silent=True) or {}
+    nome = dati.get('studente', '')
+    if nome not in [s['nome'] for s in get_studenti() if s.get('accesso') == 'spid']:
+        return jsonify({'ok': False, 'errore': 'Studente non configurato con accesso SPID'}), 400
+    if azione == 'link':
+        return jsonify({'ok': True, 'link': spid_auth.genera_link(nome)})
+    if azione == 'collega':
+        ok, msg = spid_auth.collega(nome, dati.get('testo', ''))
+        if ok:
+            from argo_client import _reset_session
+            _reset_session(nome)
+        return jsonify({'ok': ok, 'messaggio': msg, 'stato': spid_auth.stato(nome)})
+    if azione == 'stato':
+        return jsonify({'ok': True, 'stato': spid_auth.stato(nome)})
+    return jsonify({'ok': False, 'errore': 'Azione sconosciuta'}), 404
 
 @app.route('/api/test-telegram', methods=['POST'])
 def api_test_telegram():

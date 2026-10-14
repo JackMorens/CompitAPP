@@ -54,6 +54,9 @@ configuration:
       codice_scuola:
         name: Codice scuola
         description: "Il codice della scuola su DiDUP (formato SC12345). Lo trovi nel profilo dell'app DiDUP o in segreteria."
+      accesso:
+        name: Tipo di accesso (SPID solo se la scuola lo richiede)
+        description: "Lascia «password» se accedi con utente e password. Scegli «spid» se la scuola ti obbliga a SPID/CIE: non servono username e password, il collegamento si fa dalla pagina Configurazione (sperimentale)."
       username:
         name: Username DiDUP
         description: "Il nome utente con cui accedi al registro DiDUP."

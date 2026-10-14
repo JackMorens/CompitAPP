@@ -2,6 +2,7 @@ import os
 import json
 import time
 import secrets
+import threading
 import requests
 from argofamiglia import ArgoFamiglia
 from argofamiglia.CONSTANTS import ENDPOINT
@@ -10,7 +11,7 @@ def get_studenti():
     raw = os.environ.get('STUDENTI', '[]')
     try:
         studenti = json.loads(raw)
-        return [s for s in studenti if s.get('codice_scuola') and s.get('username')]
+        return [s for s in studenti if s.get('codice_scuola') and (s.get('username') or s.get('accesso') == 'spid')]
     except Exception as e:
         print(f"[ARGO] Errore parsing STUDENTI: {e}")
         return []
@@ -97,23 +98,65 @@ def _controlla_cambio_profilo(nome, indice):
         print(f"[ARGO] {nome}: controllo cambio profilo non riuscito ({e})")
 
 
+class ArgoSpid(ArgoFamiglia):
+    """Sessione Argo per chi accede con SPID/CIE: niente utente e password, il token di accesso
+    si ottiene rinnovando quello salvato da spid_auth."""
+
+    def __init__(self, school, nome):
+        self._nome_spid = nome
+        super().__init__(school, 'spid', '')
+
+    def connect(self):
+        import spid_auth
+        dati = spid_auth.rinnova(self._nome_spid)
+        school = self._ArgoFamiglia__school
+        self._ArgoFamiglia__login_data = dati
+        r = requests.post(ENDPOINT + "login", timeout=30, headers={
+            "Content-Type": "Application/json", "Accept": "Application/json",
+            "Authorization": "Bearer " + dati["access_token"]},
+            json={"clientID": secrets.token_urlsafe(64), "lista-x-auth-token": "[]",
+                  "x-auth-token-corrente": "null", "lista-opzioni-notifiche": "{}"})
+        token = r.json()["data"][0]["token"]
+        self._ArgoFamiglia__token = token
+        self._ArgoFamiglia__headers = {
+            "Content-Type": "Application/json",
+            "Authorization": "Bearer " + dati["access_token"],
+            "Accept": "Application/json",
+            "x-cod-min": school,
+            "x-auth-token": token}
+        return self
+
+
+SPID_ETA_MAX = 45 * 60     # il token di accesso dura 1 ora dopo un rinnovo: si ricrea prima
+_sessioni_creata = {}
+_sessione_lock = threading.RLock()
+
+
 def get_session(studente):
     nome = studente.get('nome', 'default')
+    spid = studente.get('accesso') == 'spid'
     global _sessions
-    try:
-        if nome not in _sessions:
-            _sessions[nome] = ArgoFamiglia(
-                studente['codice_scuola'],
-                studente['username'],
-                studente['password']
-            )
-            _scegli_profilo(_sessions[nome], studente)
-            print(f"[ARGO] ✅ Sessione creata per {nome}")
-        return _sessions[nome]
-    except Exception as e:
-        print(f"[ARGO] ❌ Errore sessione {nome}: {e}")
-        _sessions.pop(nome, None)
-        return None
+    with _sessione_lock:
+        try:
+            if spid and nome in _sessions and time.time() - _sessioni_creata.get(nome, 0) > SPID_ETA_MAX:
+                _sessions.pop(nome, None)
+            if nome not in _sessions:
+                if spid:
+                    _sessions[nome] = ArgoSpid(studente['codice_scuola'], nome)
+                else:
+                    _sessions[nome] = ArgoFamiglia(
+                        studente['codice_scuola'],
+                        studente['username'],
+                        studente['password']
+                    )
+                _sessioni_creata[nome] = time.time()
+                _scegli_profilo(_sessions[nome], studente)
+                print(f"[ARGO] ✅ Sessione creata per {nome}")
+            return _sessions[nome]
+        except Exception as e:
+            print(f"[ARGO] ❌ Errore sessione {nome}: {e}")
+            _sessions.pop(nome, None)
+            return None
 
 def _reset_session(nome):
     _sessions.pop(nome, None)

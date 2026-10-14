@@ -32,7 +32,28 @@
             <span style="font-size:1.3rem">🔌</span>
             <span class="card-title">Stato connessione DiDUP</span>
         </div>
-        {% if config.connesso %}
+        {% if config.spid %}
+        <div class="alert {{ 'alert-success' if config.spid.stato == 'collegato' else 'alert-warning' }}">
+            {% if config.spid.stato == 'collegato' %}✅ Accesso con SPID collegato — Scuola <b>{{ config.codice_scuola }}</b>
+            {% elif config.spid.stato == 'da_ricollegare' %}⚠️ Accesso con SPID <b>da ricollegare</b> (la sessione con Argo è scaduta)
+            {% else %}⚠️ Accesso con SPID <b>da collegare</b>{% endif %}
+        </div>
+        <details style="margin:10px 0" {% if config.spid.stato != 'collegato' %}open{% endif %}>
+            <summary style="cursor:pointer;font-weight:600">🔐 Collega con SPID <span class="badge badge-warning">sperimentale</span></summary>
+            <ol style="font-size:0.85rem;line-height:1.5;padding-left:20px">
+                <li>Fai questi passaggi da un <b>computer</b> (non dal telefono). Premi <b>Genera link</b> e apri il link in una nuova scheda del browser.</li>
+                <li>Prima di accedere apri gli strumenti per sviluppatori (F12 / Cmd+Opt+I), scheda <b>Rete / Network</b>, attiva <b>Conserva log</b>.</li>
+                <li>Accedi con SPID. Alla fine la pagina resta bianca o dà errore: è normale.</li>
+                <li>Nella scheda Rete filtra <code>login-callback</code>, apri la richiesta e copia il valore <b>Location</b> (comincia con <code>it.argosoft.didup.famiglia.new://login-callback?code=…</code>).</li>
+                <li>Incollalo qui sotto e premi <b>Collega</b> subito: il codice vale pochi minuti.</li>
+            </ol>
+            <button class="btn btn-primary btn-sm" onclick="spidLink()">🔗 Genera link</button>
+            <div id="spid-link" style="margin:8px 0;font-size:0.8rem;word-break:break-all"></div>
+            <textarea id="spid-testo" rows="3" placeholder="it.argosoft.didup.famiglia.new://login-callback?code=…" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:monospace;font-size:0.8rem"></textarea>
+            <button class="btn btn-success btn-sm" style="margin-top:6px" onclick="spidCollega()">✅ Collega</button>
+            <div id="spid-result" style="margin-top:8px;font-size:0.85rem"></div>
+        </details>
+        {% elif config.connesso %}
         <div class="alert alert-success">✅ Connesso come <b>{{ config.username }}</b> — Scuola <b>{{ config.codice_scuola }}</b></div>
         {% else %}
         <div class="alert alert-warning">⚠️ Non connesso — verifica le credenziali DiDUP nelle opzioni dell'add-on</div>
@@ -184,6 +205,30 @@ function getApiBase() {
         return path.slice(0, -'/configurazione'.length);
     }
     return path;
+}
+
+async function spidPost(azione, extra) {
+    const r = await fetch(getApiBase() + '/api/spid/' + azione, {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(Object.assign({studente: {{ studente_sel|tojson }}}, extra || {}))});
+    return r.json();
+}
+async function spidLink() {
+    const d = await spidPost('link');
+    const el = document.getElementById('spid-link');
+    el.innerHTML = '';
+    if (!d.ok) { el.textContent = '❌ ' + (d.errore || 'Errore'); return; }
+    const a = document.createElement('a');
+    a.href = d.link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '👉 Apri il login Argo (SPID)';
+    el.appendChild(a);
+}
+async function spidCollega() {
+    const out = document.getElementById('spid-result');
+    out.textContent = '⏳ Collegamento in corso...';
+    try {
+        const d = await spidPost('collega', {testo: document.getElementById('spid-testo').value});
+        out.textContent = (d.ok ? '✅ ' : '❌ ') + (d.messaggio || d.errore || '');
+        if (d.ok) setTimeout(() => location.reload(), 1200);
+    } catch(e) { out.textContent = '❌ Errore di rete'; }
 }
 
 async function testConnessione() {

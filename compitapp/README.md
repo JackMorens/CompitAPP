@@ -274,6 +274,24 @@ studenti:
 
 > Il campo `anno_scolastico` presente nella configurazione non viene più usato: l'anno è calcolato in automatico.
 
+### 🔐 Accesso con SPID/CIE (sperimentale, novità 2.1)
+
+Se la scuola ha tolto l'accesso con utente e password e ora chiede SPID o CIE, puoi usare CompitAPP così:
+
+```yaml
+studenti:
+  - nome: "Luca Rossi"
+    codice_scuola: "SC12345"
+    accesso: spid            # niente username e password
+```
+
+Poi apri **Configurazione → Collega con SPID** (da un computer) e segui le istruzioni a video: genera il link, accedi con SPID, copia dagli strumenti per sviluppatori del browser (scheda Rete, filtro `login-callback`) l'indirizzo che comincia con `it.argosoft.didup.famiglia.new://login-callback?code=…`, incollalo e premi **Collega**. Il codice vale pochi minuti.
+
+- L'app poi rinnova da sola l'accesso: ogni rinnovo restituisce un nuovo token, che viene salvato subito (file privato in `/data`, permessi 600, mai scritto nei registri).
+- Se Argo rifiuta il rinnovo, lo studente risulta **da ricollegare** e i genitori ricevono un solo avviso su Telegram: basta ripetere il collegamento.
+- **È sperimentale.** Un test reale ha mostrato rinnovi funzionanti per almeno 3,7 giorni; quanto duri la catena oltre non è noto e Argo può cambiarla. Tieni a portata di mano SPID per ricollegare ogni tanto.
+- Il file con i token dà accesso al registro: proteggi i backup di Home Assistant. La porta 5002 è raggiungibile in rete locale senza autenticazione, quindi chi ci arriva potrebbe usare la pagina di collegamento: non aprirla verso Internet.
+
 ### Come trovare il tuo Chat ID Telegram
 1. Cerca su Telegram il bot che hai creato
 2. Scrivigli `/start`

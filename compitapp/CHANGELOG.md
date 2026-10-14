@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0
+
+- **Accesso con SPID/CIE (sperimentale).** Per le scuole che hanno tolto l'accesso con utente e password. Nella configurazione dello studente scegli `accesso: spid` (username e password non servono), poi apri la pagina **Configurazione → Collega con SPID**: l'app genera un link, tu accedi con SPID da un computer, copi l'indirizzo finale e lo incolli. Da lì in poi l'app rinnova da sola l'accesso e salva ogni nuovo token di rinnovo subito, in uno spazio privato dell'add-on. Se Argo rifiuta il rinnovo, lo studente risulta «da ricollegare» e i genitori ricevono un solo avviso su Telegram. Non ancora provato a lungo su un account reale: per ora è sperimentale e non si sa quanto duri la catena di rinnovi oltre i 4 giorni circa verificati.
+
 ## 2.0.5
 
 - Più figli con lo stesso accesso: pulizia una tantum dei dati del secondo figlio (e successivi). Chi aveva già usato una versione precedente con `alunno` 2 poteva avere nel database compiti, voti e lezioni del primo figlio mescolati a quelli giusti (compiti doppi, orario sbagliato) e nessuna versione li ripuliva. Al primo avvio con questa versione i dati vengono cancellati e riletti da capo; i compiti non ancora scaduti possono arrivare di nuovo una volta su Telegram.
