@@ -262,7 +262,7 @@ def sync_promemoria():
                 testo = p.get('testo','')
                 docente = p.get('docente','')
                 if data_str and testo:
-                    if not _esiste(conn, 'promemoria', nome, data=data_str, testo=testo[:200]):
+                    if not _esiste(conn, 'promemoria', nome, data=data_str, testo=testo[:500]):
                         conn.execute('INSERT INTO promemoria (studente,data,testo,docente,notificato) VALUES (?,?,?,?,?)',
                                      (nome, data_str, testo[:500], docente, 1 if silenzioso else 0))
                         if not silenzioso:
